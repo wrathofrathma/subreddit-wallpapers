@@ -6,40 +6,39 @@ from urllib import request
 import pathlib
 import shutil
 from time import sleep
-from os import listdir, system
+from os import system
 import string
 import numpy as np
+from PIL import Image
 
 # Config
 prefs = {
     "user_agent": "wallpaper_engine",
-    "client_id": 'your_client_id',
-    "client_secret": 'your_secret_here',
+    "client_id": "your_id_here",
+    "client_secret": "your_secret_here",
     "aspect_ratio": (16, 9),
     "search_limit": 100,
     "download_limit": 20,
-    "subreddits": [
-      "Animewallpaper",
-    ],
+    "subreddits": ["Animewallpaper",],
     "criteria": "top",
     "time_filter": "week",  # can be all, day, hour, month, week
     "allow_nsfw": True,
     "wallpaper_directory": str(pathlib.Path.home()) + "/.wallpapers",
     "sleep": 60 * 30,
-  }
+}
 
 
 aspect_ratios = {
-  (16, 9): [(1920, 1080), (2560, 1440), (3840, 2160)],
-  (21, 9): [(2560, 1080), (3440, 1440)],
-  }
+    (16, 9): [(1920, 1080), (2560, 1440), (3840, 2160)],
+    (21, 9): [(2560, 1080), (3440, 1440)],
+}
 
 
 def check_res(title, res_dict):
     for k, v in res_dict.items():
         for res in v:
             results = re.search(res, title)
-            if(results is not None):
+            if results is not None:
                 return k
     return None
 
@@ -57,11 +56,11 @@ def filter_urls(entries, prefs):
     for entry in entries:
         submission = r.submission(id=entry)
         title = submission.title
-        if (check_res(title, res_regex) is not None):
-            if (prefs["allow_nsfw"] is False and submission.over_18 is False):
+        if check_res(title, res_regex) is not None:
+            if prefs["allow_nsfw"] is False and submission.over_18 is False:
                 urls += [(title, submission.url)]
 
-            elif (prefs["allow_nsfw"] is True):
+            elif prefs["allow_nsfw"] is True:
                 urls += [(title, submission.url)]
     return urls
 
@@ -81,7 +80,7 @@ def download_images(url_list, prefs):
     path_list = []
     # Download all .jpg & png files.
     for title, url in url_list:
-        if (url.endswith("jpg") or url.endswith("png")):
+        if url.endswith("jpg") or url.endswith("png"):
             count += 1
             title = str(title)
             rm_punctuation = dict((ord(char), None) for char in string.punctuation)
@@ -90,21 +89,22 @@ def download_images(url_list, prefs):
             path = wp_dir + "/" + title + url[-4:]
             path_list += [path]
             request.urlretrieve(url, path)
-            if (count >= prefs["download_limit"]):
+            if count >= prefs["download_limit"]:
                 return path_list
     return path_list
     # TODO - Add support for imgur albums and jpeg files.
-
 
 
 def get_entries(prefs):
     entries = []
     for sub in prefs["subreddits"]:
         s = r.subreddit(sub)
-        if (prefs["criteria"] == "top"):
-            entries += [str(x) for x in s.top(prefs["time_filter"], limit=prefs["search_limit"])]
+        if prefs["criteria"] == "top":
+            entries += [
+                str(x) for x in s.top(prefs["time_filter"], limit=prefs["search_limit"])
+            ]
 
-        elif (prefs["criteria"] == "hot"):
+        elif prefs["criteria"] == "hot":
             entries += [str(x) for x in s.hot(limit=prefs["search_limit"])]
     return entries
 
@@ -113,16 +113,17 @@ def set_background(bg):
     cmd = "gsettings set org.gnome.desktop.background picture-uri 'file://" + bg + "'"
     print(cmd)
     system(cmd)
+    system("gsettings set org.gnome.desktop.background picture-options 'scaled'")
 
 
 if __name__ == "__main__":
     r = praw.Reddit(
-        user_agent='wallpaper_engine',
-        client_id=prefs['client_id'],
-        client_secret=prefs['client_secret']
-        )
+        user_agent="wallpaper_engine",
+        client_id=prefs["client_id"],
+        client_secret=prefs["client_secret"],
+    )
 
-    while (True):
+    while True:
         # Refresh our image cache
         entries = get_entries(prefs)
         urls = filter_urls(entries, prefs)
@@ -131,5 +132,11 @@ if __name__ == "__main__":
         order = np.arange(n_wallpapers)
         np.random.shuffle(order)
         for wp in order:
+            path = wallpapers[wp]
+            img = Image.open(path)
+            # Checks if it was mislabeled
+            if img.size not in aspect_ratios[prefs["aspect_ratio"]]:
+                img.close()
+                continue
             set_background(wallpapers[wp])
             sleep(prefs["sleep"])
