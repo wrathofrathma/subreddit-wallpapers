@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import praw
 import re
 from urllib import request
